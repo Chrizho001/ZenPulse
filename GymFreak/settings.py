@@ -199,7 +199,7 @@ UNFOLD = {
 
 # Allow requests from frontend
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  
+    "https://zen-pulse-blond.vercel.app",
 ]
 
 # project/settings.py
