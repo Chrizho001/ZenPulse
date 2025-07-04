@@ -9,6 +9,7 @@ from .serializers import (
     LogoutSerializer,
 )
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 import pyotp
 from django.core.mail import send_mail
@@ -16,6 +17,13 @@ from django.conf import settings
 from .models import User, OTP, PasswordResetToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from .throttles import (
+    LoginThrottle,
+    PasswordResetThrottle,
+    RequestPasswordResetThrottle,
+    OTPRequestThrottle,
+    OTPVerifyThrottle,
+)
 
 # Create your views here.
 
@@ -60,8 +68,10 @@ class RegisterUserView(GenericAPIView):
             )
 
 
-# View for Verifying OTP
+# View for Verifying email OTP (activate account)
 class VerifyOTPView(GenericAPIView):
+    throttle_classes = [OTPVerifyThrottle]
+
     def post(self, request):
         serializer = OTPVerificationSerializer(data=request.data)
         if serializer.is_valid():
@@ -111,63 +121,66 @@ class VerifyOTPView(GenericAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class RequestOTPView(GenericAPIView):
+# View for requesting email verfication otp for password reset
+# class RequestOTPView(GenericAPIView):
+#     throttle_classes = [OTPRequestThrottle]
 
-    def post(self, request):
-        serializer = OTPRequestSerializer(data=request.data)
+#     def post(self, request):
+#         serializer = OTPRequestSerializer(data=request.data)
 
-        if serializer.is_valid(raise_exception=True):
-            email = serializer.validated_data["email"]
+#         if serializer.is_valid(raise_exception=True):
+#             email = serializer.validated_data["email"]
 
-            # get the user
-            try:
-                user = User.objects.get(email=email)
-                if user.is_verified:
-                    return Response(
-                        {"error": "OTP is invalid, user is already verified"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-            except User.DoesNotExist:
-                return Response(
-                    {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
-                )
+#             # get the user
+#             try:
+#                 user = User.objects.get(email=email)
+#                 if user.is_verified:
+#                     return Response(
+#                         {"error": "OTP is invalid, user is already verified"},
+#                         status=status.HTTP_400_BAD_REQUEST,
+#                     )
+#             except User.DoesNotExist:
+#                 return Response(
+#                     {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
+#                 )
 
-            # create otp for the user
+#             # create otp for the user
 
-            #  Generate OTP secret + code
-            otp_secret = pyotp.random_base32()
-            totp = pyotp.TOTP(otp_secret, interval=600)
-            otp_code = totp.now()
+#             #  Generate OTP secret + code
+#             otp_secret = pyotp.random_base32()
+#             totp = pyotp.TOTP(otp_secret, interval=600)
+#             otp_code = totp.now()
 
-            #  Save OTP record
-            OTP.objects.filter(user=user, is_verified=False).delete()  # Clear any old
-            OTP.objects.create(user=user, otp_secret=otp_secret)
+#             #  Save OTP record
+#             OTP.objects.filter(user=user, is_verified=False).delete()  # Clear any old
+#             OTP.objects.create(user=user, otp_secret=otp_secret)
 
-            #  Send the OTP via email
-            subject = "Your OTP Code for Verification"
-            message = f"Hi {user.first_name},\n\nYour OTP code is {otp_code}. It is valid for 10 minutes."
-            from_email = settings.DEFAULT_FROM_EMAIL
-            recipient_list = [user.email]
+#             #  Send the OTP via email
+#             subject = "Your OTP Code for Verification"
+#             message = f"Hi {user.first_name},\n\nYour OTP code is {otp_code}. It is valid for 10 minutes."
+#             from_email = settings.DEFAULT_FROM_EMAIL
+#             recipient_list = [user.email]
 
-            try:
-                send_mail(subject, message, from_email, recipient_list)
-            except Exception as e:
-                return Response(
-                    {"error": f"Failed to send email: {str(e)}"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
+#             try:
+#                 send_mail(subject, message, from_email, recipient_list)
+#             except Exception as e:
+#                 return Response(
+#                     {"error": f"Failed to send email: {str(e)}"},
+#                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                 )
 
-            return Response(
-                {
-                    "data": serializer.data,
-                    "message": f"Hi {user.first_name}, your account was created. An OTP has been sent to your email for verification.",
-                },
-                status=status.HTTP_201_CREATED,
-            )
+#             return Response(
+#                 {
+#                     "data": serializer.data,
+#                     "message": f"Hi {user.first_name}, your account was created. An OTP has been sent to your email for verification.",
+#                 },
+#                 status=status.HTTP_201_CREATED,
+#             )
 
 
 class LoginView(GenericAPIView):
     serializer_class = LoginSerializer
+    throttle_classes = [LoginThrottle]
 
     def post(self, request):
         serializer = self.serializer_class(
@@ -179,13 +192,17 @@ class LoginView(GenericAPIView):
 
 # View for Logout
 class LogoutView(GenericAPIView):
+
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)
+        user = request.user
         if serializer.is_valid():
             try:
                 refresh_token = serializer.validated_data["refresh"]
                 token = RefreshToken(refresh_token)
                 token.blacklist()  # Blacklist the refresh token
+                # Make the user to be inactive
+                user.is_active = False
                 return Response(
                     {"message": "Successfully logged out"}, status=status.HTTP_200_OK
                 )
@@ -203,6 +220,8 @@ class LogoutView(GenericAPIView):
 
 
 class PasswordResetRequestView(GenericAPIView):
+    throttle_classes = [RequestPasswordResetThrottle]
+
     def post(self, request):
         serializer = OTPRequestSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
@@ -245,6 +264,8 @@ class PasswordResetRequestView(GenericAPIView):
 
 # View for Password Reset Confirmation
 class PasswordResetConfirmView(GenericAPIView):
+    throttle_classes = [PasswordResetThrottle]
+
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         if serializer.is_valid():

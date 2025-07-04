@@ -10,6 +10,19 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+from decouple import config
+from datetime import timedelta
+
+from django.core.mail import send_mail
+
+
+
+from pathlib import Path
+import os
+
+
+
+
 from pathlib import Path
 from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -20,17 +33,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-jvs0o=xal+wwg2uw*ady&-cc4#+b0=a_m_70&cygb*_9$d^-lc'
+SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost']
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'unfold',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -42,13 +56,16 @@ INSTALLED_APPS = [
     'Fitness',
     # Third party apps
     "rest_framework",
+    "corsheaders",
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -131,21 +148,31 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
 
 
-# Looking to send emails in production? Check out our Email API/SMTP product!
-EMAIL_HOST = 'sandbox.smtp.mailtrap.io'
-EMAIL_HOST_USER = 'cb53c601acca74'
-EMAIL_HOST_PASSWORD = '0f0bd9bc8150b4'
-EMAIL_PORT = '2525'
-EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = "chrisfriday033@gmail.com"
-
 
 REST_FRAMEWORK = {
     
     'DEFAULT_AUTHENTICATION_CLASSES': (
         
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'PAGE_SIZE': 4,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user' : '500/day',
+        'login' : "5/min",
+        "otp_request" : "5/min",
+        "otp_verify" : "5/min",
+        "email_verification" : "5/min",
+        "request_password_reset" : "3/min",
+        "password_reset" : "3/min",
+        "booking" : "10/min"
+
+    }
 
 }
 
@@ -156,9 +183,48 @@ AUTHENTICATION_BACKENDS = [
 
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=10),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'BLACKLIST_AFTER_ROTATION': True,
     'TOKEN_BLACKLIST_ENABLED': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+UNFOLD = {
+    "SITE_HEADER" : "GymFreak"
+}
+
+
+# Allow requests from frontend
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  
+]
+
+# project/settings.py
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Static files (CSS, JavaScript)
+STATIC_URL = '/static/'
+
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),  # if you keep custom static assets here
+]
+
+
+EMAIL_BACKEND = config("EMAIL_BACKEND")
+
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")  # Use your Brevo email
+
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
+
+
+
+# AnyMail setup
+ANYMAIL = {
+    "SENDINBLUE_API_KEY": config("SENDINBLUE_API_KEY")
+}
+
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
