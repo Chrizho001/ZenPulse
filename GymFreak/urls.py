@@ -1,37 +1,39 @@
 """
 URL configuration for GymFreak project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
+import os
 from django.contrib import admin
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from django.urls import path, include
-from django.conf import settings
-from django.conf.urls.static import static
 
+# ✅ Auto-create superuser only in production and only once
+if os.environ.get("CREATE_SUPERUSER", "false").lower() == "true":
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    if not User.objects.filter(email="chrisfriday033@gmail.com").exists():
+        User.objects.create_superuser(
+            email="chrisfriday033@gmail.com",
+            password="christopher",
+            first_name="Chris",
+            last_name="Friday",
+        )
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/auth/', include('accounts.urls')),
-    path('api/', include('Fitness.urls')),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path("admin/", admin.site.urls),
+    path("api/auth/", include("accounts.urls")),
+    path("api/", include("Fitness.urls")),
+    path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 ]
 
+# ✅ Serve static and media files in production
 if settings.DEBUG is False:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
