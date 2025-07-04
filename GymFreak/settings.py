@@ -202,9 +202,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://zen-pulse-blond.vercel.app",
 ]
 
-# project/settings.py
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Static files (CSS, JavaScript)
 STATIC_URL = '/static/'
