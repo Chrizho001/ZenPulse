@@ -196,24 +196,29 @@ UNFOLD = {
     "SITE_HEADER" : "GymFreak"
 }
 
-
+CORS_ALLOW_ALL_ORIGINS = True  # for testing only
 # Allow requests from frontend
-CORS_ALLOWED_ORIGINS = [
-    "https://zen-pulse-blond.vercel.app",
+# CORS_ALLOWED_ORIGINS = [
+#     "https://zen-pulse-blond.vercel.app",
+# ]
+CORS_ALLOW_HEADERS = [
+    "content-type",
+    "authorization",
+    "accept",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Static files (CSS, JavaScript)
-STATIC_URL = '/static/'
-
-
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),  # if you keep custom static assets here
-]
-
+# Optional if you use WhiteNoise
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 EMAIL_BACKEND = config("EMAIL_BACKEND")
 
