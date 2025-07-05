@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.utils import timezone
 import uuid
+from cloudinary.models import CloudinaryField
 
 
 # Create your models here.
@@ -15,7 +16,7 @@ class FitnessBlog(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(unique=True)
     content = models.TextField()
-    image = models.ImageField(upload_to='uploads/images/%Y/%m/%d/', blank=True, null=True)
+    image = CloudinaryField('image', blank=True, null=True)
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=2, choices=[("DF", "Draft"), ("PB", "Published")], default="DF")
